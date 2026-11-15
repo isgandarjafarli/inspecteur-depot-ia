@@ -42,6 +42,16 @@ describe("review_repository MCP tool", () => {
     await client.connect(clientTransport);
 
     try {
+      const { tools } = await client.listTools();
+      const tool = tools.find((t) => t.name === "review_repository");
+      const properties = tool?.inputSchema.properties as
+        | Record<string, { description?: string }>
+        | undefined;
+      const description = properties?.validationCommands?.description ?? "";
+      expect(description).toContain("npm test");
+      expect(description).toContain("npm run typecheck");
+      expect(description).toContain("npm run build");
+
       const result = await client.callTool({
         name: "review_repository",
         arguments: { repo_path: repoPath },

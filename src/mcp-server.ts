@@ -19,7 +19,12 @@ export function createServer(): McpServer {
     {
       repo_path: z.string().describe("Repository path to inspect."),
       baseRef: z.string().optional(),
-      validationCommands: z.array(z.string()).optional(),
+      validationCommands: z
+        .array(z.string())
+        .optional()
+        .describe(
+          `Validation commands to run in the repository. Each must be exactly one of: ${ALLOWED_VALIDATION_COMMANDS.join(", ")}. Any other command is refused and nothing is run.`,
+        ),
     },
     async (input) => {
       const rejected = (input.validationCommands ?? []).filter(
