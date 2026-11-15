@@ -6,6 +6,13 @@ type ReportInput = {
   validationResults: ValidationResult[];
 };
 
+// A fenced code block only closes on a fence at least as long as the opening one,
+// so use one backtick more than the longest run in the content (minimum 3).
+function fenceFor(content: string): string {
+  const longestRun = Math.max(0, ...(content.match(/`+/g) ?? []).map((run) => run.length));
+  return "`".repeat(Math.max(3, longestRun + 1));
+}
+
 export function markdownReport(input: ReportInput): string {
   const lines = [`# Review Report: ${input.repositoryPath}`, "", "## Changed files"];
   for (const file of input.changedFiles) {
@@ -13,7 +20,8 @@ export function markdownReport(input: ReportInput): string {
   }
   lines.push("", "## Validation output");
   for (const result of input.validationResults) {
-    lines.push(`### ${result.command} (${result.status})`, "```", result.output, "```");
+    const fence = fenceFor(result.output);
+    lines.push(`### ${result.command} (${result.status})`, fence, result.output, fence);
   }
   return lines.join("\n");
 }
