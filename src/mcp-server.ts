@@ -6,6 +6,10 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { reviewRepository } from "./core.js";
 
+// MCP callers (AI agents) are not trusted to run arbitrary shell commands,
+// so only these exact validation commands are accepted over MCP.
+const ALLOWED_VALIDATION_COMMANDS = ["npm test", "npm run typecheck", "npm run build"];
+
 export function createServer(): McpServer {
   const server = new McpServer({ name: "repository-inspector", version: "2.0.0" });
 
@@ -18,6 +22,23 @@ export function createServer(): McpServer {
       validationCommands: z.array(z.string()).optional(),
     },
     async (input) => {
+      const rejected = (input.validationCommands ?? []).filter(
+        (command) => !ALLOWED_VALIDATION_COMMANDS.includes(command),
+      );
+      if (rejected.length > 0) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text",
+              text:
+                `Refused validation command(s): ${rejected.map((c) => JSON.stringify(c)).join(", ")}. ` +
+                `Allowed commands: ${ALLOWED_VALIDATION_COMMANDS.join(", ")}. Nothing was run.`,
+            },
+          ],
+        };
+      }
+
       const report = await reviewRepository({
         repositoryPath: input.repo_path,
         baseRef: input.baseRef,

@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -52,6 +52,35 @@ describe("review_repository MCP tool", () => {
       const text = content[0].text;
       expect(text).toContain(`# Review Report: ${repoPath}`);
       expect(text).toContain("- b.txt (added)");
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
+
+  it("refuses validation commands outside the allowlist without running them", async () => {
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const server = createServer();
+    const client = new Client({ name: "test-client", version: "0.0.0" });
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+
+    try {
+      const result = await client.callTool({
+        name: "review_repository",
+        arguments: {
+          repo_path: repoPath,
+          validationCommands: ["node -e \"require('fs').writeFileSync('pwned.txt','')\""],
+        },
+      });
+
+      expect(result.isError).toBe(true);
+      const content = result.content as Array<{ type: string; text: string }>;
+      const text = content[0].text;
+      expect(text).toContain("npm test");
+      expect(text).toContain("npm run typecheck");
+      expect(text).toContain("npm run build");
+      expect(existsSync(join(repoPath, "pwned.txt"))).toBe(false);
     } finally {
       await client.close();
       await server.close();
